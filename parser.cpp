@@ -5,12 +5,17 @@
 #include <memory>
 #include <vector>
 #include <string>
+#include <cctype>
 
 using namespace ASTNode;
 
+static std::unique_ptr<ExpressionASTNode> ParseExpression();
+static std::unique_ptr<ExpressionASTNode> ParsePrimaryExpression();
+static std::unique_ptr<ExpressionASTNode> ParseBinaryOperatorRHS(int ExpressionPrecedence,std::unique_ptr<ExpressionASTNode> LHS);
+
 static int CurrentToken;
 
-static int getNextToken() {
+int getNextToken() {
     return CurrentToken = gettok();
 };
 
@@ -25,11 +30,12 @@ std::unique_ptr<SignatureASTNode> LogErrorS(const char *str) {
 }
 
 static std::unique_ptr<ExpressionASTNode> ParseExpression() {
-    auto LHS = ParsePrimary();
+    auto LHS = ParsePrimaryExpression();
     if (!LHS) {
         return nullptr;
     } else {
-        ParseBinaryOperatorRHS(0, std::move(LHS));
+LHS = ParseBinaryOperatorRHS(0, std::move(LHS));
+  return std::move(LHS);
     }
 };
 
@@ -218,7 +224,7 @@ static void HandleTopLevelExpression() {
     }
 }
 
-static void MainLoop() {
+void MainLoop() {
     while (true) {
         fprintf(stderr, ">>> ");
         switch (CurrentToken) {

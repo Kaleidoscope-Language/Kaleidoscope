@@ -1,9 +1,5 @@
 #include <iostream>
-
-#include "lexer.h"
-#include "parser.cpp"
-
-using namespace std;
+#include "parser.h"
 
 int main(int argc, char *argv[]) {
     fprintf(stderr, ">>> ");
