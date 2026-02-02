@@ -5,7 +5,7 @@
 int main(int argc, char *argv[]) {
     fprintf(stderr, ">>> ");
     getNextToken();
-    InitializeModule();
+    InitializeModuleAndManagers();
     MainLoop();
     return 0;
 }

@@ -245,7 +245,6 @@ static void HandleTopLevelExpression() {
 
 void MainLoop() {
     while (true) {
-        fprintf(stderr, ">>> ");
         switch (CurrentToken) {
             case tok_eof:
                 return;
@@ -262,5 +261,6 @@ void MainLoop() {
                 HandleTopLevelExpression();
                 break;
         }
+        fprintf(stderr, ">>> ");
     }
 }

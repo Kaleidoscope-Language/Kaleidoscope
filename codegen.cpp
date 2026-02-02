@@ -7,10 +7,46 @@ std::unique_ptr<llvm::IRBuilder<> > Builder; // Generate IR
 std::unique_ptr<llvm::Module> TheModule; // IR code container
 std::map<std::string, llvm::Value *> NamedValues; // Symbol table
 
-void InitializeModule() {
+// Manager
+// Transform pass
+std::unique_ptr<llvm::FunctionPassManager> TheFPM; // Container for Function Passes
+
+// Analysis pass
+std::unique_ptr<llvm::LoopAnalysisManager> TheLAM; // Loop analyzer
+std::unique_ptr<llvm::FunctionAnalysisManager> TheFAM; // Function analyzer
+std::unique_ptr<llvm::CGSCCAnalysisManager> TheCGAM; // Call graph SCC detector
+std::unique_ptr<llvm::ModuleAnalysisManager> TheMAM; // Module analyzer
+
+// Debugger
+std::unique_ptr<llvm::PassInstrumentationCallbacks> ThePIC; // Pass debugger register
+std::unique_ptr<llvm::StandardInstrumentations> TheSI; // Pass debugger toolkit
+
+void InitializeModuleAndManagers() {
+    // Context, Builder, Module
     TheContext = std::make_unique<llvm::LLVMContext>();
     Builder = std::make_unique<llvm::IRBuilder<> >(*TheContext);
     TheModule = std::make_unique<llvm::Module>("JIT", *TheContext);
+
+    // Manager
+    TheFPM = std::make_unique<llvm::FunctionPassManager>();
+    TheLAM = std::make_unique<llvm::LoopAnalysisManager>();
+    TheFAM = std::make_unique<llvm::FunctionAnalysisManager>();
+    TheCGAM = std::make_unique<llvm::CGSCCAnalysisManager>();
+    TheMAM = std::make_unique<llvm::ModuleAnalysisManager>();
+    ThePIC = std::make_unique<llvm::PassInstrumentationCallbacks>();
+    TheSI = std::make_unique<llvm::StandardInstrumentations>(*TheContext, true);
+    TheSI->registerCallbacks(*ThePIC, TheMAM.get());
+
+    // Add transform passes
+    TheFPM->addPass(llvm::InstCombinePass());
+    TheFPM->addPass(llvm::ReassociatePass());
+    TheFPM->addPass(llvm::GVNPass());
+    TheFPM->addPass(llvm::SimplifyCFGPass());
+
+    llvm::PassBuilder PB;
+    PB.registerModuleAnalyses(*TheMAM);
+    PB.registerFunctionAnalyses(*TheFAM);
+    PB.crossRegisterProxies(*TheLAM, *TheFAM, *TheCGAM, *TheMAM);
 }
 
 llvm::Value *LogErrorV(const char *str) {
@@ -40,7 +76,7 @@ llvm::Value *ASTNode::BinaryExpressionASTNode::codegen() {
 
     switch (Operator) {
         case '+':
-            return Builder->CreateAdd(L, R, "addtmp");
+            return Builder->CreateFAdd(L, R, "addtmp");
         case '-':
             return Builder->CreateSub(L, R, "subtmp");
         case '*':
@@ -118,5 +154,6 @@ llvm::Function *ASTNode::FunctionASTNode::codegen() {
     }
     Builder->CreateRet(ReturnValue);
     llvm::verifyFunction(*TheFunction);
+    TheFPM->run(*TheFunction, *TheFAM);
     return TheFunction;
 }
