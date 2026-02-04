@@ -2,6 +2,8 @@
 #define CODEGEN_H
 
 #include <map>
+
+#include "ast.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/IRBuilder.h"
@@ -18,6 +20,7 @@
 #include "llvm/Transforms/Scalar/Reassociate.h"
 #include "llvm/Transforms/Scalar/GVN.h"
 #include "llvm/Transforms/Scalar/SimplifyCFG.h"
+#include "jit.h"
 
 extern std::unique_ptr<llvm::LLVMContext> TheContext; // Tool set
 extern std::unique_ptr<llvm::IRBuilder<> > Builder; // Generate IR
@@ -33,9 +36,17 @@ extern std::unique_ptr<llvm::StandardInstrumentations> TheSI; // Pass debugger t
 
 extern std::map<std::string, llvm::Value *> NamedValues; // Symbol table
 
+extern std::unique_ptr<JIT> TheJit;
+
+extern llvm::ExitOnError ExitOnErr;
+
+extern std::map<std::string, std::unique_ptr<ASTNode::SignatureASTNode> > Signatures;
+
 void InitializeModuleAndManagers();
 
 llvm::Value *LogErrorV(const char *str);
+
+
 
 
 #endif

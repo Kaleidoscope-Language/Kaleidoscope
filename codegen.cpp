@@ -2,6 +2,7 @@
 #include "ast.h"
 #include "parser.h"
 
+
 std::unique_ptr<llvm::LLVMContext> TheContext; // Tool set
 std::unique_ptr<llvm::IRBuilder<> > Builder; // Generate IR
 std::unique_ptr<llvm::Module> TheModule; // IR code container
@@ -21,11 +22,18 @@ std::unique_ptr<llvm::ModuleAnalysisManager> TheMAM; // Module analyzer
 std::unique_ptr<llvm::PassInstrumentationCallbacks> ThePIC; // Pass debugger register
 std::unique_ptr<llvm::StandardInstrumentations> TheSI; // Pass debugger toolkit
 
+std::unique_ptr<JIT> TheJit;
+
+std::map<std::string, std::unique_ptr<ASTNode::SignatureASTNode> > Signatures;
+
+llvm::ExitOnError ExitOnErr;
+
 void InitializeModuleAndManagers() {
     // Context, Builder, Module
     TheContext = std::make_unique<llvm::LLVMContext>();
     Builder = std::make_unique<llvm::IRBuilder<> >(*TheContext);
     TheModule = std::make_unique<llvm::Module>("JIT", *TheContext);
+    TheModule->setDataLayout(TheJit->getDataLayout());
 
     // Manager
     TheFPM = std::make_unique<llvm::FunctionPassManager>();
@@ -51,6 +59,18 @@ void InitializeModuleAndManagers() {
 
 llvm::Value *LogErrorV(const char *str) {
     LogError(str);
+    return nullptr;
+}
+
+llvm::Function *getFunction(std::string Name) {
+    auto *Function = TheModule->getFunction(Name);
+    if (Function != nullptr) {
+        return Function;
+    }
+    auto FI = Signatures.find(Name);
+    if (FI != Signatures.end()) {
+        return FI->second->codegen();
+    }
     return nullptr;
 }
 
@@ -90,7 +110,7 @@ llvm::Value *ASTNode::BinaryExpressionASTNode::codegen() {
 }
 
 llvm::Value *ASTNode::FunctionCallExpressionASTNode::codegen() {
-    llvm::Function *CalleeFunction = TheModule->getFunction(Callee);
+    llvm::Function *CalleeFunction = getFunction(Callee);
 
     if (CalleeFunction == nullptr) {
         return LogErrorV("Unknown function referenced");
@@ -124,10 +144,13 @@ llvm::Function *ASTNode::SignatureASTNode::codegen() {
 }
 
 llvm::Function *ASTNode::FunctionASTNode::codegen() {
-    llvm::Function *TheFunction = TheModule->getFunction(Signature->getName());
+    auto &P = *Signature;
+    Signatures[Signature->getName()] = std::move(Signature);
+
+    llvm::Function *TheFunction = TheModule->getFunction(P.getName());
 
     if (TheFunction == nullptr) {
-        TheFunction = Signature->codegen();
+        TheFunction = P.codegen();
     }
 
     if (TheFunction == nullptr) {

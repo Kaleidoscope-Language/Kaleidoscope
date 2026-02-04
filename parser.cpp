@@ -1,6 +1,7 @@
 #include "ast.h"
 #include "lexer.h"
 #include "parser.h"
+#include "codegen.h"
 #include <cstdio>
 #include <map>
 #include <vector>
@@ -8,6 +9,8 @@
 #include <cctype>
 #include <llvm/IR/Function.h>
 #include <llvm/Support/raw_ostream.h>
+
+#include "codegen.h"
 
 using namespace ASTNode;
 
@@ -211,6 +214,10 @@ static void HandleDefinition() {
         auto *FunctionIR = FunctionAST->codegen();
         fprintf(stderr, "Parsed a function definition.\n");
         FunctionIR->print(llvm::errs());
+        ExitOnErr(TheJit->addModule(
+            llvm::orc::ThreadSafeModule(std::move(TheModule), std::move(TheContext))
+        ));
+        InitializeModuleAndManagers();
     } else {
         getNextToken();
     }
@@ -223,6 +230,7 @@ static void HandleExtern() {
         if (FunctionIR != nullptr) {
             fprintf(stderr, "Parsed an extern\n");
             FunctionIR->print(llvm::errs());
+            Signatures[FunctionAST->getName()] = std::move(FunctionAST);
         }
     } else {
         getNextToken();
@@ -234,9 +242,23 @@ static void HandleTopLevelExpression() {
     if (FunctionAST != nullptr) {
         auto *FunctionIR = FunctionAST->codegen();
         if (FunctionIR != nullptr) {
-            fprintf(stderr, "Parsed a top-level expression\n");
+            // print LLVM IR
+            fprintf(stderr, "Read top-level expression:\n");
             FunctionIR->print(llvm::errs());
-            FunctionIR->eraseFromParent();
+
+            auto resource_tracker = TheJit->getMainJITDylib().createResourceTracker();
+            auto thread_safe_module = llvm::orc::ThreadSafeModule(std::move(TheModule), std::move(TheContext));
+
+            ExitOnErr(TheJit->addModule(std::move(thread_safe_module), resource_tracker));
+
+            InitializeModuleAndManagers();
+
+            auto ExprSymbol = ExitOnErr(TheJit->lookup("__anon_expr"));
+            double (*FunctionPointer)() = ExprSymbol.toPtr<double(*)()>();
+
+            fprintf(stderr, "Evaluated to %f\n", FunctionPointer());
+
+            ExitOnErr(resource_tracker->remove());
         }
     } else {
         getNextToken();
