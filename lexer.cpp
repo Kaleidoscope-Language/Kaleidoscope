@@ -52,6 +52,14 @@ int gettok() {
             return Token::tok_else;
         }
 
+        if (IdentifierStr == "for") {
+            return Token::tok_for;
+        }
+
+        if (IdentifierStr == "in") {
+            return Token::tok_in;
+        }
+
         return Token::tok_identifier;
     }
 

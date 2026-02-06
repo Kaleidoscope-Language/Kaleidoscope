@@ -126,6 +126,65 @@ static std::unique_ptr<ExpressionASTNode> ParseIfExpression() {
     return std::make_unique<IfExpressionASTNode>(std::move(ConditionNode), std::move(ThenNode), std::move(ElseNode));
 }
 
+
+static std::unique_ptr<ExpressionASTNode> ParseForExpression() {
+    getNextToken(); // Process for
+
+    if (CurrentToken != Token::tok_identifier) {
+        return LogError("Expected variable after for");
+    }
+
+    std::string VarName = IdentifierStr;
+    getNextToken(); // Process variable
+
+    if (CurrentToken != '=') {
+        return LogError("Expected '=' in the for loop");
+    }
+    getNextToken(); // Process '='(Equal symbol)
+
+    auto Start = ParseExpression(); // Process Start
+    if (Start == nullptr) {
+        return nullptr;
+    }
+
+    if (CurrentToken != ',') {
+        return LogError("Expected ',' after Start in For loop");
+    }
+    getNextToken(); // Process ','(comma)
+
+    auto End = ParseExpression(); // Process End
+    if (End == nullptr) {
+        return nullptr;
+    }
+
+    // Step is optional value
+    std::unique_ptr<ExpressionASTNode> Step;
+    if (CurrentToken == ',') {
+        // Check Step exists
+        getNextToken(); // Process ','(comma)
+        Step = ParseExpression();
+        if (Step == nullptr) {
+            return nullptr;
+        }
+    }
+
+    if (CurrentToken != Token::tok_in) {
+        return LogError("Expected 'in' keyword in the for loop");
+    }
+    getNextToken(); // Process 'in'
+
+    auto Body = ParseExpression();
+    if (Body == nullptr) {
+        return nullptr;
+    }
+
+    return std::make_unique<ForExpressionASTNode>(VarName,
+                                                  std::move(Start),
+                                                  std::move(Body),
+                                                  std::move(End),
+                                                  std::move(Step));
+}
+
 static std::unique_ptr<ExpressionASTNode> ParsePrimaryExpression() {
     switch (CurrentToken) {
         case tok_identifier:
@@ -136,6 +195,8 @@ static std::unique_ptr<ExpressionASTNode> ParsePrimaryExpression() {
             return ParseParenthesisExpression();
         case tok_if:
             return ParseIfExpression();
+        case tok_for:
+            return ParseForExpression();
         default:
             return LogError("unexpected token");
     }

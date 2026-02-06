@@ -77,6 +77,27 @@ namespace ASTNode {
                             std::unique_ptr<ExpressionASTNode> Else) : Condition(std::move(Condition)),
                                                                        Then(std::move(Then)), Else(std::move(Else)) {
         }
+
+        llvm::Value *codegen() override;
+    };
+
+    class ForExpressionASTNode : public ExpressionASTNode {
+        std::string VariableName;
+        std::unique_ptr<ExpressionASTNode> Start, End, Step, Body;
+
+    public:
+        ForExpressionASTNode(const std::string &VariableName,
+                             std::unique_ptr<ExpressionASTNode> Start,
+                             std::unique_ptr<ExpressionASTNode> End,
+                             std::unique_ptr<ExpressionASTNode> Step,
+                             std::unique_ptr<ExpressionASTNode> Body
+        ) : VariableName(VariableName),
+            Start(std::move(Start)),
+            End(std::move(End)),
+            Step(std::move(Step)),
+            Body(std::move(Body)) {
+        }
+
         llvm::Value *codegen() override;
     };
 
